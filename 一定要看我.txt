@@ -1,0 +1,220 @@
+
+
+修改索引
+
+## 点赞
+
+### 1.CourseLikeMapper.xml
+
+修改delete、insert
+
+### 2.CourseLikeMapper
+
+加了一个方法countLikesOfCourse
+
+### 3.CourseItem.vue
+
+Line 126
+
+handleLike()方法加了一个登录判断
+
+### 4.CourseController
+
+修改setCourseLike和cancelCourseLike，调用service
+
+### 5.CourseService
+
+增加setCourseLike和cancelCourseLike接口
+
+### 6.CourseServiceImpl
+
+增加setCourseLike和cancelCourseLike的实现
+
+
+
+经过前6个改动：
+
+可以实现点赞和取消点赞
+
+不能实现：
+
+图标变化
+
+
+
+### 7.CourseServiceImpl
+
+修改了
+
+getBoughtCourses 
+
+getCourse 
+
+getCourseVOPageInfo和
+
+```java
+getManageableCourses，这个方法只是加了一个false而已
+```
+
+4个方法，因为这是courseItems的初始化方法
+
+
+
+### 8.CourseVO
+
+加了一个构造方法，该构造方法多一个liked参数的设置
+
+
+
+———————————消除循环依赖———————————
+
+
+
+## 循环依赖
+
+
+
+### 9.QueryOrderServiceImpl修改
+
+添加一个私有成员引用 courseOrderMapper
+
+完成queryMostRecentOrder和getByPrimaryKey方法；
+
+
+
+————————————优惠券—————————————
+
+## 优惠券前端
+
+### 10.增加一个用户
+
+FYL 身份：admin
+
+
+
+### 11.降低autowired检测
+
+CourseLikeDeliverStrategy中有2处Spring的autowire报错；经百度，这种错误并不影响编译和执行；
+
+降低Autowired检测的级别，将Severity的级别由之前的error改成warning。
+
+
+
+### 12.CouponCreate.vue
+
+修改Line 36、41、46、56、61、66行，对判断相等的右值进行了
+
+修改Line 57、67，对错误的v-model绑定对象做了修正
+
+修改Line110，错别字改正，指定学校的课程；
+
+Line142,143 添加注释
+
+这样管理员创建优惠券时，才能输入满多少减多少、折扣多少（也是离谱，之前不能输入，优惠券就搁那儿放着，折扣也不让输入，有个p用 orz
+
+
+
+### 13.CouponDeliver.vue
+
+Line25 修改写错的词
+
+vaild--> valid
+
+### 14.CouponList.vue
+
+在handleDeliverCoupon方法中，
+
+```javascript
+deliver: this.deliverList_[this.deliverList.indexOf(this.deliver)],
+```
+
+这行是需要把中文表索引变化为英文表索引
+
+但是前面又写的全是英文
+
+Line 105 初始值修改
+
+Line 65、70等号右边
+
+Line71 v-model绑定错误
+
+
+
+Line48 修改写错的词
+
+vaild--> valid
+
+
+
+## 后端部分
+
+### 15.CouponScope.java
+
+原来的Line 16——18 （即SINGLE\TEACHER\SCHOOL）在类型转换和get方法都错了，改为：
+
+
+
+```java
+    SINGLE("单个课程", (course,coupon) -> course.getId().equals(
+ Integer.parseInt(String.valueOf(JSONHelper.getByProperty(coupon.getMetadata(), "courseId")))
+    )),
+
+    TEACHER("某个老师的课程", (course, coupon) -> course.getTeacherId().equals(
+ Integer.parseInt(String.valueOf(JSONHelper.getByProperty(coupon.getMetadata(), "teacherId")))
+    )),
+
+    SCHOOL("某个学校的课程", (course, coupon) -> course.getSchool().equals(String.valueOf(JSONHelper.getByProperty(coupon.getMetadata(), "schoolId")))),
+```
+
+
+
+### 16.DiscountCouponStrategy.java
+
+```java
+/*错误一：line 15起；
+DiscountCouponStrategy方法中discount为Object类型，到return 那里的Double强制转换会出错；
+    我的改法：增加一个double类型的变量
+    */
+```
+
+```java
+Object discountObj = JSONHelper.getByProperty(coupon.getMetadata(), "discount");
+        if (discountObj == null) {
+            // 无效优惠券
+            return false;
+        }
+        double discount=Double.parseDouble(String.valueOf(discountObj));
+        // 判断满减策略
+        return super.canUse(orderVO, coupon) && discount > 0 && discount < 1;
+```
+
+
+
+```java
+/*错误二：line 26起
+与错误一同类型*/
+double discount = Double.parseDouble(String.valueOf(JSONHelper.getByProperty(coupon.getMetadata(), "discount"));
+
+```
+
+改到这儿以后，在购买课程、创建订单时，已经可以显示并使用折扣型优惠券了；但满减型还不可以；
+
+### 17.CutDownCouponStrategy.java
+
+line 29，方法useCoupon内；类型转换问题
+
+```java
+public int useCoupon(CourseOrderVO orderVO, Coupon coupon) {
+        double cutDown = Double.parseDouble(String.valueOf(
+            JSONHelper.getByProperty(coupon.getMetadata(), "cutDown")));
+    
+        int initialCost = orderVO.getCost() == null ? 
+            orderVO.getOrigin() : orderVO.getCost();
+    
+        if (initialCost - cutDown > 0) {
+            return (int)(initialCost - cutDown);
+        } else return 0;
+    }
+```
+
+满减型也可以了；
